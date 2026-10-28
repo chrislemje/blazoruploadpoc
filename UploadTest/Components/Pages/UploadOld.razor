@@ -1,0 +1,76 @@
+@page "/uploadold"
+@rendermode InteractiveServer
+@inject IJSRuntime JS
+
+<h3>Old Blazor Server Upload (Issue Reproducer)</h3>
+
+<p class="alert alert-warning">
+    <strong>Render Mode:</strong> InteractiveServer<br />
+    <strong>Issue:</strong> On Android mobile devices, opening the native file picker suspends browser JavaScript execution. 
+    Because Blazor Server relies on a persistent SignalR WebSocket connection, the missing ping heartbeats cause the server to terminate the circuit, triggering a disconnect error.
+</p>
+
+<div class="mb-3">
+    <label for="serverFileInput" class="form-label">Select a file (Try this on Android):</label>
+    <InputFile id="serverFileInput" OnChange="HandleFileSelected" class="form-control" />
+</div>
+
+@if (isLoading)
+{
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Uploading...</span>
+    </div>
+    <p>Processing file on Blazor Server circuit...</p>
+}
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="alert alert-info mt-3">
+        @statusMessage
+    </div>
+}
+
+@if (selectedFile != null)
+{
+    <div class="card mt-3">
+        <div class="card-body">
+            <h5 class="card-title">File Details</h5>
+            <p class="card-text"><strong>Name:</strong> @selectedFile.Name</p>
+            <p class="card-text"><strong>Size:</strong> @selectedFile.Size bytes</p>
+            <p class="card-text"><strong>Type:</strong> @selectedFile.ContentType</p>
+            <p class="card-text"><strong>Last Modified:</strong> @selectedFile.LastModified.ToString("G")</p>
+        </div>
+    </div>
+}
+
+@code {
+    private IBrowserFile? selectedFile;
+    private bool isLoading = false;
+    private string statusMessage = string.Empty;
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        isLoading = true;
+        statusMessage = "File selected, reading stream over SignalR circuit...";
+
+        try
+        {
+            selectedFile = e.File;
+
+            // Simulate reading file stream over Blazor Server circuit
+            using var stream = selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+
+            statusMessage = $"Successfully uploaded '{selectedFile.Name}' ({memoryStream.Length} bytes) via SignalR Circuit!";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error processing upload: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
